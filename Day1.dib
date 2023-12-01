@@ -1,0 +1,87 @@
+#!meta
+
+{"kernelInfo":{"defaultKernelName":"fsharp","items":[{"aliases":[],"languageName":"fsharp","name":"fsharp"}]}}
+
+#!fsharp
+
+let lines = System.IO.File.ReadAllLines("day1-test-input.txt")
+            // |> Array.map Seq.toList
+
+lines
+
+#!fsharp
+
+let rec firstChar (str: char List) =
+    match str with
+    | x::xs -> 
+        match x.ToString() |> Int32.TryParse with
+        | true, number -> x
+        | false, _ -> (firstChar xs)
+    | _ -> failwith "No Numbers founds in encoding"
+
+let calibration line = 
+    int ((line |> Seq.toList  |> firstChar |> string) + (line |> Seq.rev |> Seq.toList  |> firstChar |> string))
+
+let callibrationSum = 
+    System.IO.File.ReadAllLines("day1-part1-input.txt")
+    |> Array.map calibration
+    |> Array.sum
+
+callibrationSum
+
+#!fsharp
+
+let rec indexOfAll (startPos: int) (str: string) (substr: string) =
+    match str.IndexOf(substr, startPos) with 
+    | -1 -> []
+    | idx -> idx::(indexOfAll (idx+1) str substr)
+
+indexOfAll 0 "foursix2lt7one1sevenone" "one"
+
+#!fsharp
+
+let lines = System.IO.File.ReadAllLines("day1-part1-input.txt")
+
+let digitWords = dict [
+    "one", '1';
+    "two", '2';
+    "three", '3';
+    "four", '4';
+    "five", '5';
+    "six", '6';
+    "seven", '7';
+    "eight", '8';
+    "nine", '9';
+    ]
+
+let rec digitsWithPosition pos digits (str: char List) =
+    match str with
+    | x::xs -> 
+        match x.ToString() |> Int32.TryParse with
+        | true, number -> (digitsWithPosition (pos+1) ((x, pos)::digits) xs)
+        | false, _ -> (digitsWithPosition (pos+1) digits xs)
+    | [] -> digits
+
+let wordDigitsWithPosition (str: string) =
+    digitWords.Keys
+    |> Seq.map (fun key -> (indexOfAll 0 str key) |> List.allPairs [digitWords[key]])
+    |> Seq.collect id
+    // |> Seq.filter (fun (digit, pos) -> pos <> -1)
+    |> Seq.toList
+
+wordDigitsWithPosition "foursix2lt7one1sevenone"
+
+#!fsharp
+
+let digitWithPositionList (line: string) = 
+    (line |> (Seq.toList >> digitsWithPosition 0 [])) @ (line |> wordDigitsWithPosition)
+
+let calibration list =
+    let orderedList =
+        list
+        |> List.sortBy (fun (_, pos) -> pos)
+    (orderedList.Head |> fst |> string) + (orderedList |> List.last |> fst |> string)
+
+lines 
+|> Array.map (digitWithPositionList >> calibration >> int)
+|> Array.sum
