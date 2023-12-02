@@ -1,0 +1,73 @@
+#!meta
+
+{"kernelInfo":{"defaultKernelName":"fsharp","items":[{"aliases":[],"languageName":"fsharp","name":"fsharp"}]}}
+
+#!fsharp
+
+let games = System.IO.File.ReadAllLines("day2-test-input.txt")
+            |> Array.map Seq.toList
+
+lines[0]
+
+#!fsharp
+
+let splitToTuple (str: string) =
+    let split = str.Split(" ")
+    (int split[0], split[1])
+
+let gameDetails (gameString: string) = 
+    let grabs = (gameString.Split(": ")[1])
+    grabs.Split("; ")
+    |> Array.map (fun grab -> grab.Split(", ") |> Array.map splitToTuple)
+
+// gameDetails "Game 1: 3 blue, 4 red; 1 red, 2 green, 6 blue; 2 green"
+
+let maxRed = 12
+let maxGreen = 13
+let maxBlue = 14
+
+let containsMoreThan count colour game =
+    (snd game
+    |> Array.collect id
+    |> Array.filter (fun (grabCount, grabColour) -> grabCount > count && grabColour = colour)
+    |> Array.length) > 0
+
+(1, gameDetails "Game 1: 3 blue, 4 red; 1 red, 2 green, 6 blue; 2 green")
+|> containsMoreThan 6 "blue"
+
+#!fsharp
+
+let games = System.IO.File.ReadAllLines("day2-part1-input.txt")
+            |> Array.mapi (fun idx game -> (idx+1, gameDetails game))
+            |> Array.filter (fun game -> not ((containsMoreThan maxRed "red" game) || (containsMoreThan maxGreen "green" game) || (containsMoreThan maxBlue "blue" game)))
+            |> Array.map fst
+            |> Array.sum
+
+games
+
+#!fsharp
+
+let highestGrab colour grabs =
+    grabs
+    |> Array.filter (fun (_, currColour) -> currColour = colour)
+    |> Array.sortByDescending fst
+    |> Array.head
+
+let extractPower gameDetail =
+    let grabs =
+        gameDetail
+        |> Array.collect id
+    ((highestGrab "red" grabs) |> fst) * ((highestGrab "green" grabs) |> fst) * ((highestGrab "blue" grabs) |> fst)
+    
+
+
+gameDetails "Game 1: 3 blue, 4 red; 1 red, 2 green, 6 blue; 2 green"  |> extractPower
+
+#!fsharp
+
+let games = 
+    System.IO.File.ReadAllLines("day2-part1-input.txt")
+    |> Array.map (gameDetails >> extractPower)
+    |> Array.sum
+
+games
