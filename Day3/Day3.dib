@@ -1,0 +1,86 @@
+#!meta
+
+{"kernelInfo":{"defaultKernelName":"fsharp","items":[{"aliases":[],"languageName":"fsharp","name":"fsharp"}]}}
+
+#!fsharp
+
+let lines = System.IO.File.ReadAllLines("input.txt")
+            |> Array.map (fun line -> line + ".")
+
+lines
+
+#!fsharp
+
+// "Dirty" function for parsing
+// handle number at end of line (maybe just append . at end of all lines)
+let parseLine idx line =
+    let numberCharacters = [|'0';'1';'2';'3';'4';'5';'6';'7';'8';'9'|]
+    let notSymbolCharacter = [|'0';'1';'2';'3';'4';'5';'6';'7';'8';'9';'.'|]
+    let mutable numbers = []
+    let mutable symbols = []
+    
+    let mutable number = []
+    let mutable startIdx = 0
+    let mutable inNumber = false
+    for (i, c) in (line |> Seq.mapi (fun i c -> (i,c))) do
+        // printfn "%d | %c" i c
+        if Array.contains c numberCharacters 
+        then
+            number <- number@[c]
+            startIdx <- if inNumber then startIdx else i 
+            inNumber <- true
+        else
+        if inNumber then
+            inNumber <- false
+            numbers <- (int (String.Join("", number)), (startIdx, i-1, idx))::numbers
+            number <- []
+
+        if not (Array.contains c notSymbolCharacter) then 
+            symbols <- (c, i, idx)::symbols
+
+    numbers |> List.toArray, symbols |> List.toArray
+
+
+parseLine 0 lines[0]
+
+#!fsharp
+
+// PART 1
+let parsedLines = lines |> Array.mapi parseLine
+
+let numbers = parsedLines |> Array.map fst 
+let symbols = parsedLines |> Array.map snd
+
+let checkNumber numberDetail = 
+    let (number, (startIdx, endIdx, row)) = numberDetail
+    let adjacentSymbols =
+        symbols[row-1..row+1]
+        |> Array.collect id
+        |> Array.filter (fun (_, idx, _) -> idx >= startIdx-1 && idx <= endIdx+1)
+
+    (adjacentSymbols |> Array.length) > 0
+    
+    
+numbers
+|> Array.collect id
+|> Array.filter checkNumber
+|> Array.map fst
+|> Array.sum
+
+#!fsharp
+
+// PART 2
+let adjacentNumbers symbolDetail =
+    let (symbol, idx, row) = symbolDetail
+    numbers[row-1..row+1]
+    |> Array.collect id
+    |> Array.filter (fun (_, (startIdx, endIdx, _)) -> idx >= startIdx-1 && idx <= endIdx+1)
+
+
+symbols
+|> Array.collect id
+|> Array.filter (fun (symbol, _, _) -> symbol = '*')
+|> Array.map adjacentNumbers
+|> Array.filter (Array.length >> ((=) 2) )
+|> Array.map (fun numbers -> (fst numbers[0]) * (fst numbers[1]))
+|> Array.sum
