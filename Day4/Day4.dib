@@ -1,0 +1,38 @@
+#!meta
+
+{"kernelInfo":{"defaultKernelName":"csharp","items":[{"aliases":[],"name":"csharp"},{"aliases":[],"languageName":"fsharp","name":"fsharp"}]}}
+
+#!fsharp
+
+// PART 1
+let parseLine (line: string) =
+    let lineSplits = (line.Split(": ")[1]).Split(" | ")
+    let toIntNoZeros (strNumbers: string[]) =
+        strNumbers |> Array.map (Int32.TryParse >> snd) |> Array.filter ((<>) 0)
+    (lineSplits[0]).Split(" ") |> toIntNoZeros , (lineSplits[1]).Split(" ") |> toIntNoZeros
+
+let checkNumbers (winningNumbers, numbers) =
+    numbers
+    |> Array.map (fun n -> Array.contains n winningNumbers)
+
+let worth = System.IO.File.ReadAllLines("input.txt")
+            |> Array.map (parseLine >> checkNumbers >> Array.filter id >> Array.length)
+            |> Array.filter ((<>) 0)
+            |> Array.map ((fun x -> x - 1) >> float >> (( ** ) 2.0))
+            |> Array.sum
+
+worth
+
+#!fsharp
+
+// PART 2
+let cardWins = 
+    System.IO.File.ReadAllLines("input.txt")
+    |> Array.map (parseLine >> checkNumbers >> Array.filter id >> Array.length)
+
+let rec gainedCards idx gain =
+    cardWins[idx+1..idx+gain]
+    |> Array.mapi (fun i gain -> gain + (gainedCards (i+idx+1) gain))
+    |> Array.sum
+
+(gainedCards -1 (cardWins.Length)) + cardWins.Length
