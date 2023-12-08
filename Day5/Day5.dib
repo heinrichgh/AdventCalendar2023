@@ -1,0 +1,230 @@
+#!meta
+
+{"kernelInfo":{"defaultKernelName":"csharp","items":[{"aliases":[],"name":"csharp"},{"aliases":[],"languageName":"fsharp","name":"fsharp"}]}}
+
+#!fsharp
+
+let input = System.IO.File.ReadAllText("test.txt")
+let newline = "\r\n"
+let inputSections = input.Split(newline+newline)
+inputSections
+
+let seeds = ((inputSections[0]).Split(": ")[1]).Split(" ") |> Array.map (Int64.TryParse >> snd)
+
+#!fsharp
+
+type Mapping =
+    {
+       Source: int64
+       Dest: int64
+       Range: int64 
+    }
+
+let createMappings (mappingSection: string) =
+    let lineToMapping (line :string) =
+        let splitLine =
+            line.Split(" ") 
+            |> Array.map (Int64.TryParse >> snd)
+        { Dest = splitLine[0]; Source = splitLine[1]; Range = splitLine[2]}
+
+    mappingSection.Split(newline)
+    |> Array.skip 1
+    |> Array.map lineToMapping
+
+
+let seedToSoilMap = createMappings inputSections[1]
+let soilToFertilizerMap = createMappings inputSections[2]
+let fertilizerToWaterMap = createMappings inputSections[3]
+let waterToLightMap = createMappings inputSections[4]
+let lightToTemperatureMap = createMappings inputSections[5]
+let temperatureToHumidityMap = createMappings inputSections[6]
+let humidityToLocationMap = createMappings inputSections[7]
+
+#!fsharp
+
+let destFromSrc map src =
+    let mappings = map |> Array.filter (fun m -> src >= m.Source && src < (m.Source + m.Range)) 
+    // mappings
+    match mappings.Length with 
+    | 1 -> 
+        let mapping = mappings |> Array.head
+        src + (mapping.Dest - mapping.Source)
+    | 0 -> src
+    | _ -> failwith "SOMEHOW MORE THAN 1 MAPPING WAS FOUND FOR THE GIVEN SOURCE"
+
+seeds
+|> Array.map (
+    (destFromSrc seedToSoilMap) 
+    >> (destFromSrc soilToFertilizerMap) 
+    >> (destFromSrc fertilizerToWaterMap)
+    >> (destFromSrc waterToLightMap)
+    >> (destFromSrc lightToTemperatureMap)
+    >> (destFromSrc temperatureToHumidityMap)
+    >> (destFromSrc humidityToLocationMap)
+)
+|> Array.min
+
+#!fsharp
+
+let seedStarts = seeds |> Array.mapi (fun i v -> (i, v)) |> Array.filter (fun (i, _) -> i % 2 = 0) |> Array.map snd
+let seedRanges = seeds |> Array.mapi (fun i v -> (i, v)) |> Array.filter (fun (i, _) -> i % 2 = 1) |> Array.map snd
+
+let seedPairs = Array.zip seedStarts seedRanges |> Array.map (fun (s, e) -> (s, s+e))
+seedPairs
+
+let src (a, _, _) = a
+let dest (_, b, _) = b
+let diff (_, _, c) = c
+
+let calcDiffMap map = 
+    let initBaseDiff = 
+        map 
+        |> Array.map (fun m -> (m.Source, m.Source+m.Range, m.Dest - m.Source))
+        |> Array.sortBy src
+        |> Array.toList
+    let firstSource = (src (List.head initBaseDiff))
+    let lastDest = (dest (List.last initBaseDiff))
+
+    let initBaseDiffWithStart = (Int64.MinValue, firstSource, 0L)::initBaseDiff
+    let baseDiff = if lastDest = Int64.MaxValue then initBaseDiffWithStart else initBaseDiffWithStart @ [(lastDest, Int64.MaxValue, 0L)]
+    let gaps =
+        List.zip baseDiff[0..baseDiff.Length-2] baseDiff[1..baseDiff.Length-1]
+        |> List.filter (fun ((_, dest, _), (source, _, _)) -> dest <> source)
+        |> List.map (fun ((_, dest, _), (source, _, _)) -> (dest, source, 0L))
+
+    baseDiff@gaps |> List.sortBy src
+
+let seedToSoilMapDiff = calcDiffMap seedToSoilMap 
+let soilToFertilizerMapDiff = calcDiffMap soilToFertilizerMap 
+let fertilizerToWaterMapDiff = calcDiffMap fertilizerToWaterMap 
+let waterToLightMapDiff = calcDiffMap waterToLightMap 
+let lightToTemperatureMapDiff = calcDiffMap lightToTemperatureMap 
+let temperatureToHumidityMapDiff = calcDiffMap temperatureToHumidityMap 
+let humidityToLocationMapDiff = calcDiffMap humidityToLocationMap 
+
+soilToFertilizerMapDiff
+
+#!fsharp
+
+let combineDiffs diff2 diff1 = 
+    let appliedDiff1 =
+        diff1 |> List.map (fun (s, d, r) -> (s+r, d+r, r))
+    let f =
+        (diff1 |> List.map (fun (s, d, r) -> (s, d))) @ (diff2 |> List.map (fun (s, d, r) -> (s, d)))
+        |> List.sortBy snd
+
+    let rec patchSources prevDest pairs =
+        match pairs with
+        | currPair::tail -> 
+                    let currSrc = fst currPair
+                    (if prevDest > currSrc then (prevDest, snd currPair) else currPair) :: (patchSources (snd currPair) (List.tail pairs))
+        | _ -> []
+
+    let allRanges = (patchSources 0L f)
+
+    let matchDiff diffList (source, destination) =
+        let l = 
+            diffList 
+            |> List.filter (fun (s, d, _) -> source >= s && destination <= d)
+            |> List.map diff
+        if l |> List.length = 0 then 
+            printfn "%A" diff1 
+            printfn "%A" diff2 
+            printfn "%A" allRanges 
+            printfn "%A" diffList
+            printfn "%A" (source, destination)
+            failwith "AAAAAAAAAAAH"
+        else 
+            l |> List.head
+    
+    let diff1Diffs = allRanges |> List.map (matchDiff appliedDiff1)
+   // let appliedDiff1 = (List.zip allRanges diff1Diffs) |> List.map (fun ((s, d), diff) -> (s+diff, d+diff))
+    let diff2Diffs = allRanges |> List.map (matchDiff diff2)
+    
+    List.zip3 allRanges diff1Diffs diff2Diffs
+    |> List.map (fun ((s, d), d1, d2) -> (s, d, d1+d2))
+    |> List.filter (fun (s, d, _) -> s <> d)
+
+
+// let  = calcDiffMap seedToSoilMap 
+// let  = calcDiffMap soilToFertilizerMap 
+// let  = calcDiffMap fertilizerToWaterMap 
+// let  = calcDiffMap waterToLightMap 
+// let  = calcDiffMap lightToTemperatureMap 
+// let  = calcDiffMap temperatureToHumidityMap 
+// let  = calcDiffMap humidityToLocationMap 
+seedToSoilMapDiff
+|> combineDiffs soilToFertilizerMapDiff
+|> combineDiffs fertilizerToWaterMapDiff
+
+// combineDiffs seedToSoilMapDiff (combineDiffs soilToFertilizerMapDiff (combineDiffs fertilizerToWaterMapDiff (combineDiffs waterToLightMapDiff (combineDiffs lightToTemperatureMapDiff (combineDiffs temperatureToHumidityMapDiff humidityToLocationMapDiff)))))
+
+#!fsharp
+
+let combineDiffs diff2 diff1 = 
+    let diff1Outputs =
+        diff1 |> List.map (fun (s, d, r) -> (s+r, d+r, r))
+    // printfn "%A" diff1Outputs   
+    let f =
+        (diff1Outputs |> List.map (fun (s, d, r) -> (s, d))) @ (diff2 |> List.map (fun (s, d, r) -> (s, d)))
+        |> List.sortBy snd
+
+    printfn "%A"  f
+    let rec patchSources prevPair pairs =
+        match pairs with
+        | currPair::tail -> 
+                    (Int64.Min((snd prevPair), (fst currPair)), Int64.Max((fst prevPair), (snd currPair))) :: (patchSources currPair (List.tail pairs))
+        | _ -> []
+
+    let allRanges = (patchSources (Int64.MinValue,Int64.MinValue) f) |> List.filter (fun (a,b) -> a <> b)
+    printfn "%A"  allRanges
+    
+    let matchDiff diffList (source, destination) =
+            diffList 
+            |> List.filter (fun (s, d, _) -> source >= s && destination <= d)
+            |> List.map diff
+            |> List.head
+
+    let diff1Diffs = allRanges |> List.map (matchDiff diff1Outputs)
+    // diff1Diffs    
+    let diff2Diffs = allRanges |> List.map (matchDiff diff2)
+    // diff2Diffs
+    List.zip3 allRanges diff1Diffs diff2Diffs
+    |> List.map (fun ((s, d), d1, d2) -> (s, d, d1+d2))
+    |> List.filter (fun (s, d, _) -> s <> d)
+
+#!fsharp
+
+let i =
+    seedToSoilMapDiff
+    |> combineDiffs soilToFertilizerMapDiff
+
+#!fsharp
+
+i
+|> combineDiffs fertilizerToWaterMapDiff
+
+#!fsharp
+
+let expandDiffs diff1 diff2 =
+    if src diff1 > src diff2 &&  src diff1 > dest diff2 then 
+        []
+    else 
+    if src diff2 > src diff1 &&  src diff2 > dest diff1 then
+        []
+    else 
+    if src diff2 < src diff1 && dest diff2 < dest diff1 then // diff2 partial left overlap with diff1
+        [(src diff2, src diff1, diff diff2), (src diff1, dest diff2, (diff diff1) + (diff diff2)), (dest diff2, dest diff1, diff diff1)]
+    else
+    if src diff2 >= src diff1 && dest diff2 <= dest diff1 then // diff2 inside diff1
+        [(src diff1, src diff2, diff diff1), (src diff2, dest diff2, (diff diff1) + (diff diff2)), (dest diff2, dest diff1, diff diff1)]
+    else
+    if src diff2 >= src diff1 && dest diff2 > dest diff1 then // diff2 partial right overlap with diff1
+        [(src diff1, src diff2, diff diff1), (src diff2, dest diff1, (diff diff1) + (diff diff2)), (dest diff1, dest diff2, diff diff2)]
+    else 
+    if src diff2 < src diff1 && dest diff2 > dest diff1 then // diff2 covers diff1
+        [(src diff2, src diff1, diff diff2), (src diff1, dest diff1, (diff diff1) + (diff diff2)), (dest diff1, dest diff2, diff diff2)]
+    else 
+        []
+
+expandDiffs (0, 50, 0) (0, 15, 39)

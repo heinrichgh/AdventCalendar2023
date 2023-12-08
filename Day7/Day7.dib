@@ -1,0 +1,226 @@
+#!meta
+
+{"kernelInfo":{"defaultKernelName":"fsharp","items":[{"aliases":[],"languageName":"fsharp","name":"fsharp"}]}}
+
+#!fsharp
+
+let cardMap = Map [
+        ('2', 2);
+        ('3', 3);
+        ('4', 4);
+        ('5', 5);
+        ('6', 6);
+        ('7', 7);
+        ('8', 8);
+        ('9', 9);
+        ('T', 10);
+        ('J', 11);
+        ('Q', 12);
+        ('K', 13);
+        ('A', 14)
+    ]
+
+let cardToNumber card = cardMap[card]
+
+let parseLine (line:string) =
+    let split = line.Split(" ")
+    ((split[0] |> Seq.toArray |> Array.map cardToNumber), int split[1])
+
+let countCard hand card =
+    hand |> Array.filter ((=) card) |> Array.length
+
+let countCards hand = 
+    hand 
+    |> Array.distinct
+    |> Array.map (fun card -> (card, countCard hand card))
+    |> Array.sortByDescending snd
+    
+
+let isFiveKind hand = hand |> Array.reduce (fun acc curr -> if acc = curr then curr else -1) <> -1
+let isFourKind hand = ((countCards hand) |> Array.head |> snd) = 4
+let isFullHouse hand = 
+    let countedCards = (countCards hand) |> Array.toList
+    match countedCards with
+    | f::s::tail -> (snd f) = 3 && (snd s) = 2
+    | _ -> false
+let isThreeKind hand = ((countCards hand) |> Array.head |> snd) = 3
+let isTwoPair hand = 
+    let countedCards = (countCards hand) |> Array.toList
+    match countedCards with
+    | f::s::tail -> (snd f) = 2 && (snd s) = 2
+    | _ -> false
+let isOnePair hand = ((countCards hand) |> Array.head |> snd) = 2
+
+let handTypeRank hand =
+    if hand |> isFiveKind then 6 else
+    if hand |> isFourKind then 5 else
+    if hand |> isFullHouse then 4 else
+    if hand |> isThreeKind then 3 else
+    if hand |> isTwoPair then 2 else
+    if hand |> isOnePair then 1 else
+    0
+
+// could have used HEX, but lazy
+let handNumber (hand: int array) =
+    hand[0] * 100000000
+    + hand[1] * 1000000
+    + hand[2] * 10000
+    + hand[3] * 100
+    + hand[4] * 1
+
+let handsTypeRanked = 
+    System.IO.File.ReadAllLines("input.txt")
+    |> Array.map 
+        ( parseLine
+          >> (fun (hand, bet) -> (hand, bet, handTypeRank hand, handNumber hand))
+        )
+
+let rankTypedHands typeRank hands =
+    let typeHands = hands |> Array.filter (fun (_, _, tr, _) -> tr = typeRank)
+    typeHands |> Array.sortBy (fun (_, _, _, hn) -> hn)
+(
+(rankTypedHands 0 handsTypeRanked |> Array.toList)
+@ (rankTypedHands 1 handsTypeRanked |> Array.toList)
+@ (rankTypedHands 2 handsTypeRanked |> Array.toList)
+@ (rankTypedHands 3 handsTypeRanked |> Array.toList)
+@ (rankTypedHands 4 handsTypeRanked |> Array.toList)
+@ (rankTypedHands 5 handsTypeRanked |> Array.toList)
+@ (rankTypedHands 6 handsTypeRanked |> Array.toList)
+)
+|> List.mapi (fun i (hand, bet, _, _) -> (i+1)*bet)
+|> List.sum
+
+#!fsharp
+
+// PART 2
+let cardMap = Map [
+        ('J', 1);
+        ('2', 2);
+        ('3', 3);
+        ('4', 4);
+        ('5', 5);
+        ('6', 6);
+        ('7', 7);
+        ('8', 8);
+        ('9', 9);
+        ('T', 10);
+        ('Q', 12);
+        ('K', 13);
+        ('A', 14)
+    ]
+
+let cardToNumber card = cardMap[card]
+
+let parseLine (line:string) =
+    let split = line.Split(" ")
+    ((split[0] |> Seq.toArray |> Array.map cardToNumber), int split[1])
+
+let countCard hand card =
+    hand |> Array.filter ((=) card) |> Array.length
+
+let countCards hand = 
+    hand 
+    |> Array.distinct
+    |> Array.map (fun card -> (card, countCard hand card))
+    |> Array.sortByDescending snd
+    |> Array.toList
+    
+let createCardCountMap countedCards =
+    Map.ofList 
+
+let hasJoker countedCardsMap = 
+    Map.containsKey 1 countedCardsMap
+
+let isFiveKind countedCards countedCardsMap = 
+    if countedCardsMap |> hasJoker then
+        countedCardsMap[1] = 5 
+        || (countedCards |> List.filter (fun (c, _) -> c <> 1) |> List.head |> snd) + countedCardsMap[1] = 5
+    else
+        (countedCards |> List.head |> snd) = 5
+
+let isFourKind countedCards countedCardsMap = 
+    if countedCardsMap |> hasJoker then
+        (countedCards |> List.filter (fun (c, _) -> c <> 1) |> List.head |> snd) + countedCardsMap[1] = 4
+    else
+        (countedCards |> List.head |> snd) = 4
+
+// max 3 jokers
+let isFullHouse countedCards countedCardsMap = 
+    let f::s::tail = (countedCards |> List.filter (fun (c, _) -> c <> 1))
+    let firstCardCount = (snd f)
+    let secondCardCount = (snd s)
+    if firstCardCount = 3 && secondCardCount = 2 then 
+        true
+    else
+        if countedCardsMap |> hasJoker then
+            match countedCardsMap[1] with
+            | 1 ->  firstCardCount = 2 && secondCardCount = 2 || (firstCardCount = 3 && secondCardCount = 1)
+            | 2 ->  (firstCardCount = 2 && secondCardCount = 2 ) || (firstCardCount = 3 && secondCardCount = 1) || (firstCardCount = 2 && secondCardCount = 1)
+            | 3 ->  true
+        else
+            false
+
+let isThreeKind countedCards countedCardsMap = 
+    if countedCardsMap |> hasJoker then
+        (countedCards |> List.head |> snd) + countedCardsMap[1] = 3
+    else
+        (countedCards |> List.head |> snd) = 3
+
+// Max 2 jokers
+let isTwoPair countedCards countedCardsMap = 
+    let f::s::tail = (countedCards |> List.filter (fun (c, _) -> c <> 1))
+    let firstCardCount = (snd f)
+    let secondCardCount = (snd s)
+    if firstCardCount = 2 && secondCardCount = 2 then 
+        true
+    else
+        if countedCardsMap |> hasJoker then
+            match countedCardsMap[1] with
+            | 1 ->  firstCardCount = 2
+            | 2 ->  true 
+        else
+            false
+
+let isOnePair countedCards countedCardsMap = 
+    (countedCardsMap |> hasJoker) || ((countedCards |> List.head |> snd) = 2)
+
+let handTypeRank hand =
+    let countedCards = hand |> countCards
+    let countedCardsMap = countedCards |> Map.ofList
+    if isFiveKind countedCards countedCardsMap then 6 else
+    if isFourKind countedCards countedCardsMap then 5 else
+    if isFullHouse countedCards countedCardsMap then 4 else
+    if isThreeKind countedCards countedCardsMap then 3 else
+    if isTwoPair countedCards countedCardsMap then 2 else
+    if isOnePair countedCards countedCardsMap then 1 else
+    0
+
+// could have used HEX, but lazy
+let handNumber (hand: int array) =
+    hand[0] * 100000000
+    + hand[1] * 1000000
+    + hand[2] * 10000
+    + hand[3] * 100
+    + hand[4] * 1
+
+let handsTypeRanked = 
+    System.IO.File.ReadAllLines("input.txt")
+    |> Array.map 
+        ( parseLine
+          >> (fun (hand, bet) -> (hand, bet, handTypeRank hand, handNumber hand))
+        )
+
+let rankTypedHands typeRank hands =
+    let typeHands = hands |> Array.filter (fun (_, _, tr, _) -> tr = typeRank)
+    typeHands |> Array.sortBy (fun (_, _, _, hn) -> hn)
+(
+(rankTypedHands 0 handsTypeRanked |> Array.toList)
+@ (rankTypedHands 1 handsTypeRanked |> Array.toList)
+@ (rankTypedHands 2 handsTypeRanked |> Array.toList)
+@ (rankTypedHands 3 handsTypeRanked |> Array.toList)
+@ (rankTypedHands 4 handsTypeRanked |> Array.toList)
+@ (rankTypedHands 5 handsTypeRanked |> Array.toList)
+@ (rankTypedHands 6 handsTypeRanked |> Array.toList)
+)
+|> List.mapi (fun i (hand, bet, _, _) -> (i+1)*bet)
+|> List.sum

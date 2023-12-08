@@ -1,0 +1,44 @@
+#!meta
+
+{"kernelInfo":{"defaultKernelName":"fsharp","items":[{"aliases":[],"languageName":"fsharp","name":"fsharp"}]}}
+
+#!fsharp
+
+let lines = System.IO.File.ReadAllLines("input.txt")
+
+let times = 
+    (lines[0].Split(":")[1]).Trim().Split(" ")
+    |> Array.map ((fun v -> v.Trim()) >> Int32.TryParse >> snd)
+    |> Array.filter ((<>) 0)
+    
+let distances = 
+    (lines[1].Split(":")[1]).Trim().Split(" ")
+    |> Array.map ((fun v -> v.Trim()) >> Int32.TryParse >> snd)
+    |> Array.filter ((<>) 0)
+
+let input = Array.zip times distances
+
+let bound1 (time, distance) = 
+    let timef = float time
+    let distancef = float distance
+    // printfn "%A" (-timef)
+    // printfn "%A" (timef**2.0)
+    // printfn "%A" (4.0*distancef)
+    Math.Floor((-timef + Math.Sqrt(timef**2.0 - (4.0*distancef))) / -2.0) + 1.0 // from quadratic formula
+
+let bound2 (time, distance) = 
+    let timef = float time
+    let distancef = float distance
+    Math.Ceiling((-timef - Math.Sqrt(timef**2.0 - (4.0*distancef))) / -2.0) - 1.0 // from quadratic formula
+
+input
+|> Array.map (fun inp -> (bound2 inp) - (bound1 inp) + 1.0)
+|> Array.reduce (*)
+
+#!fsharp
+
+// PART 2
+let time = 59796575.0
+let distance = 597123410321328.0
+
+(bound2 (time, distance)) - (bound1 (time, distance)) + 1.0
