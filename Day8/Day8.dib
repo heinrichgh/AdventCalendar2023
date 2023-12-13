@@ -1,0 +1,102 @@
+#!meta
+
+{"kernelInfo":{"defaultKernelName":"csharp","items":[{"aliases":[],"name":"csharp"},{"aliases":[],"languageName":"fsharp","name":"fsharp"}]}}
+
+#!fsharp
+
+// PART 1
+let lines  = 
+    System.IO.File.ReadAllLines("input.txt")
+
+let instructions: (string*string -> string) array = 
+    lines[0]
+    |> Seq.toArray
+    |> Array.map (fun v -> if v = 'L' then (fst) else (snd))
+
+let parseNodeLine (line: string) =
+    let eqSplit = line.Split(" = ")
+    let nodesSplit = (eqSplit[1].Substring(1, 8)).Split(", ")
+    (eqSplit[0], (nodesSplit[0], nodesSplit[1]))
+
+let nodes = 
+    lines[2..]
+    |> Array.map parseNodeLine
+    |> Map.ofArray
+
+let rec lookup currentLocation count =
+    let instruction = instructions[count % instructions.Length]
+    let nextLocation = instruction nodes[currentLocation]
+    let currentCount = count+1
+    if nextLocation = "ZZZ"
+    then currentCount
+    else lookup nextLocation currentCount
+
+lookup "AAA" 0
+
+#!fsharp
+
+// PART 2
+let lines  = 
+    System.IO.File.ReadAllLines("input.txt")
+
+let instructions: (string*string -> string) array = 
+    lines[0]
+    |> Seq.toArray
+    |> Array.map (fun v -> if v = 'L' then (fst) else (snd))
+
+let parseNodeLine (line: string) =
+    let eqSplit = line.Split(" = ")
+    let nodesSplit = (eqSplit[1].Substring(1, 8)).Split(", ")
+    (eqSplit[0], (nodesSplit[0], nodesSplit[1]))
+
+let nodes = 
+    lines[2..]
+    |> Array.map parseNodeLine
+    |> Map.ofArray
+
+let startingNodes =
+    nodes.Keys
+    |> Seq.filter (fun x -> x[2] = 'A')
+    |> Seq.toArray
+
+let finished (node:string) = node[2] = 'Z'
+
+let rec locationsAllFinished (locations: string array) =
+    if locations.Length = 0 
+    then true
+    else
+    if locations[0][2] <> 'Z' 
+    then false
+    else locationsAllFinished (locations[1..])
+
+let instructionsLength = int64 instructions.Length
+instructionsLength
+
+let rec lookupPart2 (count:int64) currentLocation =
+    let instruction = instructions[int (count % instructionsLength)]
+    let nextLocation = instruction nodes[currentLocation]
+    let currentCount = count+1L
+    if nextLocation[2] = 'Z'
+    then currentCount
+    else lookup nextLocation currentCount
+
+// let rec lookupPart2Concurrent currentLocations (count:int64) =
+//     let instruction = instructions[int (count % instructionsLength)]
+//     let nextLocations = currentLocations |> Array.map (fun currentLocation -> instruction nodes[currentLocation])
+//     let currentCount = count+1L
+//     if nextLocations |> locationsAllFinished
+//     then currentCount
+//     else lookupPart2Concurrent nextLocations currentCount
+// When you see the pattern and realize '!MATHS!', as is the norm...
+
+let rec greatestCommonDenominator a b = 
+    match (a,b) with
+    | (x,0L) -> x
+    | (0L, y) -> y
+    | (a,b) -> greatestCommonDenominator b (a % b)
+
+let leastCommonMultiple a b = a*b/(greatestCommonDenominator a b)
+
+startingNodes
+|> Array.map (lookupPart2 0L)
+|> Array.reduce leastCommonMultiple
